@@ -81,7 +81,12 @@ def authorize():
     except Exception as error:
         handle_error(error)
 
-    access_token = json.loads(bearer_response.text)["access_token"]
+    try:
+        access_token = json.loads(bearer_response.text)["access_token"]
+    except KeyError:
+        print("[!] Failed to log in.")
+        sys.exit(2)
+        
     headers.update({"Authorization": "Bearer " + access_token})
 
 def main(argv):
@@ -181,7 +186,8 @@ if __name__ == "__main__":
     try:
         f = open("config.txt")
     except:
-        f = open("config.txt", "w")
+        print("[!] config.txt not found.")
+        sys.exit(2)
 
     configs = f.read().split("\n")
     config = {}
