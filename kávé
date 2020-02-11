@@ -12,7 +12,7 @@ import getopt
 from datetime import date
 from time import sleep
 
-__version__ = "KÁVÉ 1.5"
+__version__ = "KÁVÉ 1.8"
 __help__ = """\
 Usage:
     kávé [options] user-agent
@@ -77,7 +77,7 @@ def kávé(user_agent):
 def authorize():
     print("Logging in...")
     try:
-        bearer_response = requests.post(idp_url, data=bearer_route)
+        bearer_response = requests.post(idp_url, data=bearer_route, headers={"User-Agent": login_agent})
     except Exception as error:
         handle_error(error)
 
@@ -86,7 +86,7 @@ def authorize():
     except KeyError:
         print("[!] Failed to log in.")
         sys.exit(2)
-        
+
     headers.update({"Authorization": "Bearer " + access_token})
 
 def main(argv):
@@ -137,6 +137,8 @@ def main(argv):
             sys.exit(0)
 
     authorize()
+
+    print("Running KÁVÉ...")
 
     if MODE == 1:
         for char in chars:
@@ -215,6 +217,11 @@ if __name__ == "__main__":
     except KeyError:
         print("You must specify the password in the config.txt")
         sys.exit(2)
+
+    try:
+        login_agent = config["login_ua"]
+    except KeyError:
+        login_agent = ""
 
     from_date = date.today() 
     to_date = date.today()
