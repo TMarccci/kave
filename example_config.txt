@@ -1,0 +1,3 @@
+institute_code klik0000001
+username 7326437345124
+password 2000-01-01

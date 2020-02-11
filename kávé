@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 #  Kreta General   Behaviour  Analyser
-#    aka
-#  Kréta Általános Viselkedés Érzékelő   KÁVÉ
+#  Kréta Általános Viselkedés Érzékelő 
 
 import requests
 import json
