@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+
+#  Kreta General   Behaviour  Analyser
+#    aka
+#  Kréta Általános Viselkedés Érzékelő   KÁVÉ
+
+import requests
+import json
+import time
+import sys
+from threading import Thread
+import getopt
+from datetime import date
+from time import sleep
+
+__version__ = "KÁVÉ 1.5"
+__help__ = """\
+Usage:
+    kávé [options] user-agent
+
+Options:
+    -h, --help              Shows this help message.
+    -v, --version           Show the current verison of KÁVÉ.
+    -c, --chars             Test characters.
+    -l, --list              Test for user-agents from a file.
+    -a, --average           Get average response time
+    --samples               Number of samples to be taken.
+    --rate-limit            Enable rate-limiting.
+
+Description:
+    Kréta Általános Viselkedés Érzékelő
+"""
+
+def average():
+    return round(sum(results) / len(results) * 100) / 100
+
+def handle_error(error, agent=""):
+    if type(error) == requests.exceptions.ConnectionError:
+        print("[!]", agent+":", "Connection rejected.")
+        sys.exit(104)
+    else:
+        print("[!]", agent+":", error)
+        sys.exit(100)
+
+def allowed_chars(string):
+    allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-./();#+'?,*<>"
+    for char in string:
+        if not char in allowed:
+            return False
+
+    return True
+
+def kávé(user_agent):
+    local_headers = headers
+    local_headers.update({"User-Agent": user_agent})
+
+    start = time.time()
+    try:
+        api_response = requests.get(api_url + lesson_route, headers=local_headers)
+    except Exception as error:
+        handle_error(error, user_agent)
+
+    took = time.time() - start
+    took = round(took*1000)
+    response_code = int(api_response.status_code)
+
+    if response_code == 500:
+        if allowed_chars(headers["User-Agent"]):
+            print(user_agent+":", "blocked, HTTP 500")
+        else:
+            print(user_agent+":", "[!] Invalid characters.")
+        sys.exit(101)
+
+    print(user_agent+":", took, "ms, HTTP", response_code)
+    
+    results.append(took)
+
+def authorize():
+    print("Logging in...")
+    try:
+        bearer_response = requests.post(idp_url, data=bearer_route)
+    except Exception as error:
+        handle_error(error)
+
+    access_token = json.loads(bearer_response.text)["access_token"]
+    headers.update({"Authorization": "Bearer " + access_token})
+
+def main(argv):
+    try:
+        opts, args = getopt.getopt(argv,"hvc:l:a",["help","version","chars=","list=","average","samples=","rate-limit"])
+    except getopt.GetoptError:
+        print(__help__)
+        sys.exit(2)
+
+    MODE = 0
+    rate_limit = False
+
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            print(__help__)
+            sys.exit(0)
+
+        elif opt in ("-v", "--version"):
+            print(__version__)
+            sys.exit(0)
+
+        elif opt in ("-c", "--chars"):
+            MODE = 1
+            chars = arg
+
+        elif opt in ("-l", "--list"):
+            MODE = 2
+            ualist = arg
+
+        elif opt in ("-a", "--average"):
+            MODE = 3
+
+        elif opt == "--samples":
+            try:
+                samples = int(arg)
+            except ValueError:
+                print("[!] Must be an intiger.")
+                sys.exit(2)
+
+        elif opt == "--rate-limit":
+            rate_limit = True
+
+    if MODE == 0:
+        agents = sys.argv[1:]
+
+        if len(agents) == 0:
+            print(__help__)
+            sys.exit(0)
+
+    authorize()
+
+    if MODE == 1:
+        for char in chars:
+            threads.append(Thread(target=kávé, args=(char,)))
+
+    elif MODE == 3:
+        try:
+            for i in range(samples):
+                try:
+                    threads.append(Thread(target=kávé, args=(args[0],)))
+                except IndexError:
+                    print("[!] You must set a user-agent")
+                    sys.exit(2)
+        except UnboundLocalError:
+            print("[!] You must specify the number of samples! (--samples ...)")
+            sys.exit(2)
+
+    else:
+        if MODE == 2:
+            uafile = open(ualist)
+            agents = uafile.read().split("\n")
+            uafile.close()
+
+        for agent in agents:
+            threads.append(Thread(target=kávé, args=(agent,)))
+
+    # Start execution
+    for thread in threads:
+        thread.start()
+
+        if rate_limit:
+            sleep(1)
+
+    # Wait unitl finished
+    for thread in threads:
+        thread.join()
+
+    if MODE == 3:
+        try:
+            print("Average:", average(), "ms")
+        except ZeroDivisionError:
+            print("[!] No values received.")
+            sys.exit(2)
+
+
+if __name__ == "__main__":
+    try:
+        f = open("config.txt")
+    except:
+        f = open("config.txt", "w")
+
+    configs = f.read().split("\n")
+    config = {}
+    f.close()
+
+    for c in configs:
+        c = c.split(" ")
+        config[c[0]] = " ".join(c[1:])
+
+    client_id = "919e0c1c-76a2-4646-a2fb-7085bbbf3c56"
+    try:
+        institute_code = config["institute_code"]
+    except KeyError:
+        print("You must specify the institute code in the config.txt")
+        sys.exit(2)
+
+    try:
+        username = config["username"]
+    except KeyError:
+        print("You must specify the username in the config.txt")
+        sys.exit(2)
+
+    try:
+        password = config["password"]
+    except KeyError:
+        print("You must specify the password in the config.txt")
+        sys.exit(2)
+
+    from_date = date.today() 
+    to_date = date.today()
+
+    idp_url = f"https://{institute_code}.e-kreta.hu/idp/api/v1/Token"
+    api_url = f"https://{institute_code}.e-kreta.hu/mapi/api/v1/"
+
+    bearer_route = f"institute_code={institute_code}&userName={username}&password={password}&grant_type=password&client_id={client_id}"
+    lesson_route = f"Lesson?fromDate={from_date}&toDate={to_date}"
+
+    headers = {} # Base Headers
+    results = []
+    threads = []
+
+    main(sys.argv[1:])
