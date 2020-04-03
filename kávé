@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #  Kreta General   Behaviour  Analyser
-#  Kréta Általános Viselkedés Érzékelő 
+#  Kréta Általános Viselkedés Érzékelő
 
 import requests
 import json
@@ -22,7 +22,7 @@ Options:
     -v, --version           Show the current verison of KÁVÉ.
     -c, --chars             Test characters.
     -l, --list              Test for user-agents from a file.
-    -a, --average           Get average response time
+    -a, --average           Get average response time.
     --samples               Number of samples to be taken.
     --rate-limit            Enable rate-limiting.
 
@@ -30,8 +30,10 @@ Description:
     Kréta Általános Viselkedés Érzékelő
 """
 
+
 def average():
     return round(sum(results) / len(results) * 100) / 100
+
 
 def handle_error(error, agent=""):
     if type(error) == requests.exceptions.ConnectionError:
@@ -41,6 +43,7 @@ def handle_error(error, agent=""):
         print("[!]", agent+":", error)
         sys.exit(100)
 
+
 def allowed_chars(string):
     allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-./();#+'?,*<>"
     for char in string:
@@ -49,13 +52,15 @@ def allowed_chars(string):
 
     return True
 
+
 def kávé(user_agent):
     local_headers = headers
     local_headers.update({"User-Agent": user_agent})
 
     start = time.time()
     try:
-        api_response = requests.get(api_url + lesson_route, headers=local_headers)
+        api_response = requests.get(
+            api_url + lesson_route, headers=local_headers)
     except Exception as error:
         handle_error(error, user_agent)
 
@@ -71,15 +76,17 @@ def kávé(user_agent):
         sys.exit(101)
 
     print(user_agent+":", took, "ms, HTTP", response_code)
-    
+
     results.append(took)
+
 
 def authorize():
     print("Logging in...")
     try:
-        bearer_response = requests.post(idp_url, data=bearer_route, headers={"User-Agent": login_agent})
+        bearer_response = requests.post(idp_url, data=bearer_route, headers={
+                                        "User-Agent": login_agent})
     except Exception as error:
-        handle_error(error)
+        handle_error(error, login_agent)
 
     try:
         access_token = json.loads(bearer_response.text)["access_token"]
@@ -89,9 +96,12 @@ def authorize():
 
     headers.update({"Authorization": "Bearer " + access_token})
 
+
+
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv,"hvc:l:a",["help","version","chars=","list=","average","samples=","rate-limit"])
+        opts, args = getopt.getopt(argv, "hvc:l:a", [
+                                   "help", "version", "chars=", "list=", "average", "samples=", "rate-limit"])
     except getopt.GetoptError:
         print(__help__)
         sys.exit(2)
@@ -146,7 +156,7 @@ def main(argv):
 
     elif MODE == 3:
         try:
-            for i in range(samples):
+            for _ in range(samples):
                 try:
                     threads.append(Thread(target=kávé, args=(args[0],)))
                 except IndexError:
@@ -223,7 +233,7 @@ if __name__ == "__main__":
     except KeyError:
         login_agent = ""
 
-    from_date = date.today() 
+    from_date = date.today()
     to_date = date.today()
 
     idp_url = f"https://{institute_code}.e-kreta.hu/idp/api/v1/Token"
@@ -232,8 +242,11 @@ if __name__ == "__main__":
     bearer_route = f"institute_code={institute_code}&userName={username}&password={password}&grant_type=password&client_id={client_id}"
     lesson_route = f"Lesson?fromDate={from_date}&toDate={to_date}"
 
-    headers = {} # Base Headers
+    headers = {}  # Base Headers
     results = []
     threads = []
 
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except KeyboardInterrupt:
+        sys.exit(1)
